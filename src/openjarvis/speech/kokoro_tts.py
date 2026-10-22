@@ -59,6 +59,27 @@ def _ptbr_accent_enabled() -> bool:
     return os.environ.get("OPENJARVIS_KOKORO_PTBR_ACCENT", "1") != "0"
 
 
+# Custom voice packs (style vectors distilled or blended locally) live in
+# ``<OPENJARVIS_HOME>/voices/<voice_id>.pt``. Kokoro only knows the voices of
+# hexgrad/Kokoro-82M by name: with the Hub online it asks the Hub first and a
+# local-only voice is a 404, even if a copy sits in the HF cache. Passing the
+# file path makes Kokoro load it directly, online or offline, on any machine.
+_VOICE_ID_RE = re.compile(r"^[a-z]{2}_[A-Za-z0-9_-]+$")
+
+
+def custom_voice_path(voice_id: str) -> str | None:
+    """Return the local ``.pt`` for a custom voice ID, or ``None``."""
+    if not voice_id or not _VOICE_ID_RE.match(voice_id):
+        return None
+    home = os.environ.get("OPENJARVIS_HOME")
+    if not home:
+        from openjarvis.core.paths import get_config_dir
+
+        home = str(get_config_dir())
+    path = os.path.join(home, "voices", f"{voice_id}.pt")
+    return path if os.path.isfile(path) else None
+
+
 _DEFAULT_LANG_CODE = "a"
 _DEFAULT_VOICE_ID = "af_heart"
 
@@ -226,7 +247,9 @@ class KokoroTTSBackend(TTSBackend):
         with self._pipeline_lock:
             pipeline = self._ensure_pipeline(lang_code)
             samples = []
-            for _, _, audio in pipeline(text, voice=voice_id, speed=speed):
+            # language still comes from the ID prefix (pf_/pm_ -> pt-br)
+            voice = custom_voice_path(voice_id) or voice_id
+            for _, _, audio in pipeline(text, voice=voice, speed=speed):
                 samples.append(audio)
 
         if not samples:

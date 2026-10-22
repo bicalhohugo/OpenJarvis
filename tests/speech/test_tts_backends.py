@@ -436,4 +436,20 @@ def test_kokoro_ptbr_accent_rewrites_espeak_phonemes():
     assert ptbr_accent("tˈaɾəʤy") == "tˈahʤy"  # tarde
     assert ptbr_accent("trˌabaljˈar.") == "trˌabaʎˈah."  # trabalhar
     assert ptbr_accent("xˈatʊ kˈaxʊ") == "xˈatʊ kˈaxʊ"  # rato, carro: already Brazilian
-    assert ptbr_accent("kriˈaɾ ˈoʒy") == "kriˈaɾ ˈoʒy"  # linking tap before a vowel stays
+    # linking tap before a vowel stays
+    assert ptbr_accent("kriˈaɾ ˈoʒy") == "kriˈaɾ ˈoʒy"
+
+
+def test_kokoro_custom_voice_path_from_openjarvis_home(tmp_path, monkeypatch):
+    """Custom voices load from <OPENJARVIS_HOME>/voices/<id>.pt (no Hub lookup)."""
+    from openjarvis.speech.kokoro_tts import custom_voice_path
+
+    (tmp_path / "voices").mkdir()
+    (tmp_path / "voices" / "pf_operadora13.pt").write_bytes(b"x")
+    monkeypatch.setenv("OPENJARVIS_HOME", str(tmp_path))
+    expected = str(tmp_path / "voices" / "pf_operadora13.pt")
+    assert custom_voice_path("pf_operadora13") == expected
+    # official voice: Kokoro resolves it by name
+    assert custom_voice_path("pf_dora") is None
+    assert custom_voice_path("../secret") is None  # only plain voice IDs
+    assert custom_voice_path("") is None
